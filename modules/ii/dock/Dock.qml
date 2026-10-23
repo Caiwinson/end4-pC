@@ -289,19 +289,9 @@ Scope {
                                 onClicked: GlobalStates.overviewOpen = !GlobalStates.overviewOpen
                             }
 
-                            DockSeparator {
-                                visible: Config.options.dock.showAppsButton
-                            }
-
                             DockPinButton {
                                 pinned: root.pinned
                                 onToggled: root.pinned = !root.pinned
-                            }
-
-                            DockSeparator {
-                                visible: Config.options.dock.showPinButton
-                                    && (dockRow.hasPinnedApps
-                                        || !(Config.options.dock.showMedia && activeApps.media.hasTrack))
                             }
 
                             DragApps {
@@ -313,18 +303,11 @@ Scope {
                                 pinnedApps: Config.options?.dock.pinnedApps ?? []
                             }
 
-                            DockSeparator {
-                                visible: dockRow.hasPinnedApps
-                                    && (activeApps.activeUnpinned.length > 0
-                                        || (Config.options.dock.showMedia && MprisController.activePlayer !== null))
-                            }
-
                             DockActiveApps {
                                 id: activeApps
                                 contextMenu: dockContextMenu
                                 appListRoot: dragSlots
                             }
-
                         }
                     }
                 }
