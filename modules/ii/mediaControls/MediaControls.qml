@@ -82,6 +82,43 @@ Scope {
         return filtered;
     }
 
+    // --- Pause cava when the active window is fullscreen ---
+    property bool activeWindowFullscreen: false
+
+    Process {
+        id: fullscreenCheck
+        command: ["hyprctl", "activewindow", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const w = JSON.parse(text);
+                    // fullscreen: 0 = none, 1 = maximized, 2 = fullscreen
+                    root.activeWindowFullscreen = w.fullscreen === true || Number(w.fullscreen) >= 2;
+                } catch (e) {
+                    // empty output = no active window
+                    root.activeWindowFullscreen = false;
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: fullscreenDebounce
+        interval: 50
+        onTriggered: fullscreenCheck.running = true
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (["fullscreen", "activewindow", "activewindowv2", "workspace", "workspacev2",
+                 "focusedmon", "closewindow", "movewindow"].includes(event.name))
+                fullscreenDebounce.restart();
+        }
+    }
+
+    Component.onCompleted: fullscreenCheck.running = true
+
     Process {
         id: cavaProc
         running: (GlobalStates.mediaControlsOpen ||
@@ -96,6 +133,7 @@ Scope {
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
             Config.options.background.widgets.visualizer.enable)
             && (MprisController.activePlayer?.isPlaying ?? false)
+            && !root.activeWindowFullscreen
         onRunningChanged: {
             if (!cavaProc.running) {
                 GlobalStates.visualizerPoints = [];

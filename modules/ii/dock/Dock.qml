@@ -285,6 +285,14 @@ Scope {
                             columnSpacing: DockStyle.spacing
                             property bool hasPinnedApps: (Config.options?.dock.pinnedApps?.length ?? 0) > 0
 
+                            DockAppsButton {
+                                onClicked: GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+                            }
+
+                            DockSeparator {
+                                visible: Config.options.dock.showAppsButton
+                            }
+
                             DockPinButton {
                                 pinned: root.pinned
                                 onToggled: root.pinned = !root.pinned
@@ -317,13 +325,6 @@ Scope {
                                 appListRoot: dragSlots
                             }
 
-                            DockSeparator {
-                                visible: Config.options.dock.showAppsButton
-                            }
-
-                            DockAppsButton {
-                                onClicked: GlobalStates.overviewOpen = !GlobalStates.overviewOpen
-                            }
                         }
                     }
                 }
