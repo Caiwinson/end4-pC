@@ -66,7 +66,7 @@ Scope {
             // Find duplicates by trackTitle prefix
             for (let j = i + 1; j < players.length; ++j) {
                 let p2 = players[j];
-                if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (Math.abs(p1.position - p2.position) <= 2 && Math.abs(p1.length - p2.length) <= 2)) {
+                if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (p1.position - p2.position <= 2 && p1.length - p2.length <= 2)) {
                     group.push(j);
                 }
             }
@@ -80,6 +80,14 @@ Scope {
             group.forEach(idx => used.add(idx));
         }
         return filtered;
+    }
+
+    // --- Only run cava when the active player is Feishin ---
+    readonly property bool activePlayerIsFeishin: {
+        const p = MprisController.activePlayer
+        if (!p) return false
+        return (p.identity ?? "").toLowerCase().includes("feishin") ||
+               (p.desktopEntry ?? "").toLowerCase().includes("feishin")
     }
 
     // --- Pause cava when the active window is fullscreen ---
@@ -133,6 +141,7 @@ Scope {
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
             Config.options.background.widgets.visualizer.enable)
             && (MprisController.activePlayer?.isPlaying ?? false)
+            && root.activePlayerIsFeishin
             && !root.activeWindowFullscreen
         onRunningChanged: {
             if (!cavaProc.running) {
