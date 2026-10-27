@@ -3,6 +3,7 @@ pragma Singleton
 import qs.modules.common
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.UPower
 import QtQuick
 
 /*
@@ -26,9 +27,15 @@ Singleton {
     property bool available: false
     // What we last asked for
     property bool paused: false
+    // The power policy (not the user) paused the wallpaper
+    property bool pausedByPolicy: false
+    // The user resumed the wallpaper while the policy wanted it paused
+    property bool policyOverridden: false
 
     readonly property bool pauseOnBattery: Config.options?.background.liveWallpaper.pauseOnBattery ?? false
     readonly property real pauseBelowPercent: Config.options?.background.liveWallpaper.pauseBelowPercent ?? 0
+    // Pause while the power profile is "power-saver" (set to false to disable)
+    readonly property bool pauseOnPowerSaver: true
 
     function sendCommand(json) {
         if (!root.available) return;
@@ -43,7 +50,12 @@ Singleton {
         root.sendCommand(`{"command":["set_property","pause",${value}]}`);
     }
 
-    function toggle() { root.setPaused(!root.paused) }
+    function toggle() {
+        // A manual toggle takes over from the power policy
+        root.pausedByPolicy = false;
+        if (root.policyWantsPause) root.policyOverridden = root.paused;
+        root.setPaused(!root.paused);
+    }
     function pause()  { root.setPaused(true) }
     function resume() { root.setPaused(false) }
 
@@ -66,11 +78,15 @@ Singleton {
                 }
                 try {
                     const reply = JSON.parse(line);
-                    root.available = reply.error === "success";
-                    if (root.available) root.paused = reply.data === true;
+                    const ok = reply.error === "success";
+                    // Update `paused` first so the policy sees fresh state
+                    if (ok) root.paused = reply.data === true;
+                    root.available = ok;
                 } catch (e) {
                     root.available = false;
                 }
+                // Re-apply the policy every poll: survives wallpaper restarts
+                root.applyPolicy();
             }
         }
     }
@@ -82,14 +98,41 @@ Singleton {
         onTriggered: pollProc.running = true
     }
 
-    // Policies: a laptop on battery has better things to do than loop a video
-    readonly property bool shouldPauseForPower: root.available
-        && Battery.available && !Battery.isPluggedIn
-        && (root.pauseOnBattery
-            || (root.pauseBelowPercent > 0 && Battery.percentage * 100 <= root.pauseBelowPercent))
+    // Power policies. UPower.onBattery is true whenever AC is unplugged, which
+    // is more reliable than inferring it from the battery's charge state.
+    readonly property bool onBattery: UPower.onBattery
+    readonly property bool powerSaverActive: root.pauseOnPowerSaver
+        && PowerProfiles.profile === PowerProfile.PowerSaver
 
-    onShouldPauseForPowerChanged: {
-        if (root.shouldPauseForPower) root.pause();
-        else if (root.paused) root.resume();
+    readonly property bool batteryPolicyActive: root.onBattery
+        && (root.pauseOnBattery
+            || (root.pauseBelowPercent > 0 && Battery.available
+                && Battery.percentage * 100 <= root.pauseBelowPercent))
+
+    readonly property bool policyWantsPause: root.batteryPolicyActive || root.powerSaverActive
+    readonly property bool shouldPauseForPower: root.available && root.policyWantsPause
+
+    function applyPolicy() {
+        if (!root.available) return;
+        if (root.policyWantsPause) {
+            if (!root.paused && !root.policyOverridden) {
+                root.pausedByPolicy = true;
+                root.pause();
+            }
+        } else {
+            root.policyOverridden = false;
+            // Only resume what the policy paused
+            if (root.pausedByPolicy) {
+                root.pausedByPolicy = false;
+                root.resume();
+            }
+        }
+    }
+
+    onShouldPauseForPowerChanged: root.applyPolicy()
+    onPolicyWantsPauseChanged: {
+        console.log(`[LiveWallpaper] policyWantsPause=${root.policyWantsPause} `
+            + `onBattery=${root.onBattery} powerSaver=${root.powerSaverActive} available=${root.available}`);
+        root.applyPolicy();
     }
 }
