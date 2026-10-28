@@ -37,6 +37,8 @@ Singleton {
     // Pause while the power profile is "power-saver" (set to false to disable)
     readonly property bool pauseOnPowerSaver: true
 
+    function load() {}
+
     function sendCommand(json) {
         if (!root.available) return;
         commandProc.command = ["bash", "-c",
