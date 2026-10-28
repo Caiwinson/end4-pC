@@ -53,6 +53,8 @@ ShellRoot {
         LyricsService.restartLyrics()
         LiveWallpaper.load()
     }
+
+    PowerProfileOsd {}
     
     PanelFamilyLoader {
         identifier: "ii"
