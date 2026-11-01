@@ -55,6 +55,7 @@ ShellRoot {
     }
 
     PowerProfileOsd {}
+    DisplayModeOsd {}
     
     PanelFamilyLoader {
         identifier: "ii"
