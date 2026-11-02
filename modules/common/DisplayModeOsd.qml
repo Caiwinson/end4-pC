@@ -1,10 +1,15 @@
+pragma Singleton
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
 
 // Shows an OSD whenever ~/.config/hypr/display-mode changes (SUPER + P).
-Scope {
+Singleton {
     id: root
+    // Call from shell.qml Component.onCompleted to instantiate this singleton
+    function load() {}
+
     property bool shown: false
     property bool ready: false   // ignore the initial value at startup
     property string mode: "off"

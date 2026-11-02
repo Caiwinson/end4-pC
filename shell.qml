@@ -52,10 +52,9 @@ ShellRoot {
         Updates.load()
         LyricsService.restartLyrics()
         LiveWallpaper.load()
+        PowerProfileOsd.load()
+        DisplayModeOsd.load()
     }
-
-    PowerProfileOsd {}
-    DisplayModeOsd {}
     
     PanelFamilyLoader {
         identifier: "ii"
