@@ -175,7 +175,7 @@ Item {
                 onClicked: {
                     const entry = slotItem.appEntry
                     if (!entry || entry.toplevels.length === 0) {
-                        slotItem.deskEntry?.execute()
+                        AppLauncher.launch(slotItem.deskEntry)
                         return
                     }
                     const next = (slotItem._lastFocused + 1) % entry.toplevels.length
@@ -183,7 +183,7 @@ Item {
                     entry.toplevels[next].activate()
                 }
 
-                middleClickAction: () => { slotItem.deskEntry?.execute() }
+                middleClickAction: () => { AppLauncher.launch(slotItem.deskEntry) }
                 altAction:         () => { root.contextMenu?.open(dockBtn, slotItem.appId) }
 
                 contentItem: DockAppIcon {

@@ -16,6 +16,16 @@ Singleton {
 
     property string query: ""
 
+    // Launch a command in its own systemd scope so it survives a Quickshell restart
+    function detachedLaunch(command) {
+        if (!command || command.length === 0) return;
+        Quickshell.execDetached([
+            "systemd-run", "--user", "--scope", "--collect",
+            "--slice=app.slice",
+            ...command
+        ]);
+    }
+
     function ensurePrefix(prefix) {
         if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.symbols, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch,].some(i => root.query.startsWith(i))) {
             root.query = prefix + root.query.slice(1);
@@ -370,10 +380,10 @@ Singleton {
                 verb: Translation.tr("Open"),
                 execute: () => {
                     if (!entry.runInTerminal)
-                        entry.execute();
+                        root.detachedLaunch(entry.command);
                     else {
                         // Probably needs more proper escaping, but this will do for now
-                        Quickshell.execDetached(["bash", '-c', `${Config.options.apps.terminal} -e '${StringUtils.shellSingleQuoteEscape(entry.command.join(' '))}'`]);
+                        root.detachedLaunch(["bash", '-c', `${Config.options.apps.terminal} -e '${StringUtils.shellSingleQuoteEscape(entry.command.join(' '))}'`]);
                     }
                 },
                 comment: entry.comment,
@@ -387,9 +397,9 @@ Singleton {
                         iconType: LauncherSearchResult.IconType.System,
                         execute: () => {
                             if (!action.runInTerminal)
-                                action.execute();
+                                root.detachedLaunch(action.command);
                             else {
-                                Quickshell.execDetached(["bash", '-c', `${Config.options.apps.terminal} -e '${StringUtils.shellSingleQuoteEscape(action.command.join(' '))}'`]);
+                                root.detachedLaunch(["bash", '-c', `${Config.options.apps.terminal} -e '${StringUtils.shellSingleQuoteEscape(action.command.join(' '))}'`]);
                             }
                         }
                     });
@@ -427,7 +437,7 @@ Singleton {
                 if (cleanedCommand.startsWith(Config.options.search.prefix.shellCommand)) {
                     cleanedCommand = cleanedCommand.slice(Config.options.search.prefix.shellCommand.length);
                 }
-                Quickshell.execDetached(["bash", "-c", root.query.startsWith('sudo') ? `${Config.options.apps.terminal} fish -C '${cleanedCommand}'` : cleanedCommand]);
+                root.detachedLaunch(["bash", "-c", root.query.startsWith('sudo') ? `${Config.options.apps.terminal} fish -C '${cleanedCommand}'` : cleanedCommand]);
             }
         });
         const webSearchResultObject = resultComp.createObject(null, {
