@@ -54,6 +54,7 @@ ShellRoot {
         LiveWallpaper.load()
         PowerProfileOsd.load()
         DisplayModeOsd.load()
+        AudioDeviceOsd.load()
     }
     
     PanelFamilyLoader {
