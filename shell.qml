@@ -52,9 +52,6 @@ ShellRoot {
         Updates.load()
         LyricsService.restartLyrics()
         LiveWallpaper.load()
-        PowerProfileOsd.load()
-        DisplayModeOsd.load()
-        AudioDeviceOsd.load()
     }
     
     PanelFamilyLoader {
