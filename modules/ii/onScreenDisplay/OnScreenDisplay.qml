@@ -11,6 +11,8 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Mpris
+import QtQml.Models
 
 Scope {
     id: root
@@ -44,11 +46,16 @@ Scope {
             id: "audioDevice",
             sourceUrl: "indicators/AudioDeviceIndicator.qml"
         },
+        {
+            id: "playerVolume",
+            sourceUrl: "indicators/PlayerVolumeIndicator.qml"
+        },
     ]
 
     // Ignore initial values emitted at startup
     property bool startupDone: false
     property string displayMode: "off"
+    property var volumePlayer: null
     Timer {
         running: true
         interval: 1000
@@ -138,6 +145,40 @@ Scope {
         }
     }
 
+    // Watch every MPRIS player's volume (playerctl -a volume ...)
+    Instantiator {
+        model: Mpris.players
+        delegate: Scope {
+            id: playerWatcher
+            required property var modelData
+            property bool armed: false
+            property real lastVolume: modelData?.volume ?? 0
+
+            // Ignore the volume the player reports right after appearing
+            Timer {
+                running: true
+                interval: 500
+                onTriggered: playerWatcher.armed = true
+            }
+
+            Connections {
+                target: playerWatcher.modelData
+                function onVolumeChanged() {
+                    const v = playerWatcher.modelData.volume;
+                    if (!playerWatcher.armed || !root.startupDone || Math.abs(v - playerWatcher.lastVolume) < 0.0001) {
+                        playerWatcher.lastVolume = v;
+                        return;
+                    }
+                    playerWatcher.lastVolume = v;
+                    root.protectionMessage = "";
+                    root.volumePlayer = playerWatcher.modelData;
+                    root.currentIndicator = "playerVolume";
+                    root.triggerOsd();
+                }
+            }
+        }
+    }
+
     // Shows an OSD whenever ~/.config/hypr/display-mode changes (SUPER + P)
     FileView {
         readonly property var validModes: ["on", "off"]
@@ -223,6 +264,12 @@ Scope {
                         Loader {
                             id: osdIndicatorLoader
                             source: root.indicators.find(i => i.id === root.currentIndicator)?.sourceUrl
+                        }
+                        Binding {
+                            target: osdIndicatorLoader.item
+                            property: "player"
+                            value: root.volumePlayer
+                            when: root.currentIndicator === "playerVolume" && osdIndicatorLoader.item !== null
                         }
                         Binding {
                             target: osdIndicatorLoader.item
