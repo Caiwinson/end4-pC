@@ -9,6 +9,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import Quickshell.Services.UPower
+import Quickshell.Services.Pipewire
 
 Scope {
     id: root
@@ -30,7 +32,28 @@ Scope {
             id: "gamma",
             sourceUrl: "indicators/GammaIndicator.qml"
         },
+        {
+            id: "powerProfile",
+            sourceUrl: "indicators/PowerProfileIndicator.qml"
+        },
+        {
+            id: "displayMode",
+            sourceUrl: "indicators/DisplayModeIndicator.qml"
+        },
+        {
+            id: "audioDevice",
+            sourceUrl: "indicators/AudioDeviceIndicator.qml"
+        },
     ]
+
+    // Ignore initial values emitted at startup
+    property bool startupDone: false
+    property string displayMode: "off"
+    Timer {
+        running: true
+        interval: 1000
+        onTriggered: root.startupDone = true
+    }
 
     function triggerOsd() {
         GlobalStates.osdVolumeOpen = true;
@@ -89,6 +112,48 @@ Scope {
         function onSinkProtectionTriggered(reason) {
             root.protectionMessage = reason;
             root.currentIndicator = "volume";
+            root.triggerOsd();
+        }
+    }
+
+    Connections {
+        target: PowerProfiles
+        function onProfileChanged() {
+            if (!root.startupDone)
+                return;
+            root.protectionMessage = "";
+            root.currentIndicator = "powerProfile";
+            root.triggerOsd();
+        }
+    }
+
+    Connections {
+        target: Pipewire
+        function onDefaultAudioSinkChanged() {
+            if (!root.startupDone)
+                return;
+            root.protectionMessage = "";
+            root.currentIndicator = "audioDevice";
+            root.triggerOsd();
+        }
+    }
+
+    // Shows an OSD whenever ~/.config/hypr/display-mode changes (SUPER + P)
+    FileView {
+        readonly property var validModes: ["on", "off"]
+        path: Quickshell.env("HOME") + "/.config/hypr/display-mode"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const m = text().trim();
+            // Writes truncate first, so ignore empty/partial reads.
+            if (validModes.indexOf(m) === -1)
+                return;
+            root.displayMode = m;
+            if (!root.startupDone)
+                return;
+            root.protectionMessage = "";
+            root.currentIndicator = "displayMode";
             root.triggerOsd();
         }
     }
@@ -158,6 +223,12 @@ Scope {
                         Loader {
                             id: osdIndicatorLoader
                             source: root.indicators.find(i => i.id === root.currentIndicator)?.sourceUrl
+                        }
+                        Binding {
+                            target: osdIndicatorLoader.item
+                            property: "mode"
+                            value: root.displayMode
+                            when: root.currentIndicator === "displayMode" && osdIndicatorLoader.item !== null
                         }
 
                         Item {
