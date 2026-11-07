@@ -16,35 +16,35 @@ Singleton {
         Qt.callLater(() => GlobalStates.settingsOpen = false)
     }
 
-    // Local branch that holds your own commits (rebased onto upstream on every update)
-    readonly property string tweakBranch: "my-tweaks"
+    // Branch to track (your tweaks are now merged into main)
+    readonly property string branch: "main"
 
     function runUpdateDots() {
         const updateScript = `
             set -e
             DIR="$HOME/.config/quickshell/end4-pC"
-            BRANCH="${root.tweakBranch}"
+            BRANCH="${root.branch}"
 
             # Not a git clone yet? Fresh clone, nothing to preserve.
             if [ ! -d "$DIR/.git" ]; then
                 rm -rf "$DIR"
-                git clone https://github.com/pctrade/end4-pC.git "$DIR"
+                git clone https://github.com/Caiwinson/end4-pC.git "$DIR"
                 cd "$DIR"
-                git checkout -b "$BRANCH"
+                git checkout "$BRANCH"
             else
                 cd "$DIR"
                 git fetch origin
 
-                # Make sure we are on the tweak branch
-                git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH"
+                # Make sure we are on main
+                git checkout "$BRANCH"
 
-                # Replay your commits on top of the latest upstream main
-                if ! git rebase --autostash origin/main; then
+                # Fast-forward to the latest main, replaying any local commits on top
+                if ! git pull --rebase --autostash origin "$BRANCH"; then
                     git rebase --abort || true
                     echo
-                    echo "Update stopped: your tweaks conflict with upstream changes."
+                    echo "Update stopped: your local changes conflict with upstream changes."
                     echo "Your files are untouched. Resolve manually in $DIR with:"
-                    echo "  git rebase origin/main"
+                    echo "  git pull --rebase origin $BRANCH"
                     exit 1
                 fi
             fi
