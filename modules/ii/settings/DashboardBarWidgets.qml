@@ -11,6 +11,7 @@ QtObject {
         { id: "liveWallpaper", name: Translation.tr("Live wallpaper"), icon: "play_pause" },
         { id: "media", name: Translation.tr("Media"), icon: "music_note" },
         { id: "resources", name: Translation.tr("Resources"), icon: "empty_dashboard" },
+        { id: "gpu", name: Translation.tr("GPU"), icon: "developer_board" },
         { id: "systemIcons", name: Translation.tr("System Icons"), icon: "info" },
         { id: "networkSpeed", name: Translation.tr("Network Speed"), icon: "network_check" },
         { id: "clockWidget", name: Translation.tr("Clock"), icon: "schedule" },
