@@ -32,6 +32,7 @@ Singleton {
                 cd "$DIR"
                 git checkout "$BRANCH"
             else
+                gh repo sync Caiwinson/end4-pC
                 cd "$DIR"
                 git fetch origin
 
