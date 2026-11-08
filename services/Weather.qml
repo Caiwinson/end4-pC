@@ -10,18 +10,15 @@ import qs.modules.common
 
 Singleton {
     id: root
+
     // 10 minute
     readonly property int fetchInterval: Config.options.bar.weather.fetchInterval * 60 * 1000
     readonly property string city: Config.options.bar.weather.city
     readonly property bool useUSCS: Config.options.bar.weather.useUSCS
     property bool gpsActive: Config.options.bar.weather.enableGPS
 
-    onUseUSCSChanged: {
-        root.getData();
-    }
-    onCityChanged: {
-        root.getData();
-    }
+    onUseUSCSChanged: root.getData()
+    onCityChanged: root.getData()
 
     property var location: ({
         valid: false,
@@ -36,278 +33,101 @@ Singleton {
         sunset: 0,
         windDir: 0,
         wCode: 0,
-        city: 0,
-        wind: 0,
-        precip: 0,
-        visib: 0,
-        press: 0,
-        temp: 0,
-        tempFeelsLike: 0,
-        lastRefresh: 0,
+        city: "",
+        wind: "",
+        precip: "",
+        visib: "",
+        press: "",
+        temp: "",
+        tempFeelsLike: "",
+        lastRefresh: ""
     })
 
     function refineData(data) {
-        let temp = {};
-        temp.uv = data?.current?.uvIndex || 0;
-        temp.humidity = (data?.current?.humidity || 0) + "%";
-        temp.sunrise = data?.astronomy?.sunrise || "0.0";
-        temp.sunset = data?.astronomy?.sunset || "0.0";
-        temp.windDir = data?.current?.winddir16Point || "N";
-        temp.wCode = data?.current?.weatherCode || "113";
-        temp.city = data?.location?.areaName[0]?.value || "City";
-        temp.temp = "";
-        temp.tempFeelsLike = "";
-        if (root.useUSCS) {
-            temp.wind = (data?.current?.windspeedMiles || 0) + " mph";
-            temp.precip = (data?.current?.precipInches || 0) + " in";
-            temp.visib = (data?.current?.visibilityMiles || 0) + " m";
-            temp.press = (data?.current?.pressureInches || 0) + " psi";
-            temp.temp += (data?.current?.temp_F || 0);
-            temp.tempFeelsLike += (data?.current?.FeelsLikeF || 0);
-            temp.temp += "°F";
-            temp.tempFeelsLike += "°F";
-        } else {
-            temp.wind = (data?.current?.windspeedKmph || 0) + " km/h";
-            temp.precip = (data?.current?.precipMM || 0) + " mm";
-            temp.visib = (data?.current?.visibility || 0) + " km";
-            temp.press = (data?.current?.pressure || 0) + " hPa";
-            temp.temp += (data?.current?.temp_C || 0);
-            temp.tempFeelsLike += (data?.current?.FeelsLikeC || 0);
-            temp.temp += "°C";
-            temp.tempFeelsLike += "°C";
-        }
-        temp.lastRefresh = DateTime.time + " • " + DateTime.date;
-        root.data = temp;
-    }
-
-    function getData() {
-        let command = "curl -s wttr.in";
-
-        if (root.useOpenMeteo) return root.getDataOpenMeteo();
-        if (root.gpsActive && root.location.valid) {
-            command += `/${root.location.lat},${root.location.long}`;
-        } else {
-            command += `/${formatCityName(root.city)}`;
-        }
-
-        // format as json
-        command += "?format=j1";
-        command += " | ";
-        // only take the current weather, location, asytronmy data
-        command += "jq '{current: .current_condition[0], location: .nearest_area[0], astronomy: .weather[0].astronomy[0]}'";
-        fetcher.command[2] = command;
-        fetcher.running = true;
-    }
-
-    function formatCityName(cityName) {
-        return cityName.trim().split(/\s+/).join('+');
-    }
-
-    // ─── Open-Meteo backend (local tweak) ────────────────────────────────────
-    // Everything below is additive so upstream edits to Weather.qml merge cleanly.
-    // Weather via Open-Meteo (no API key) + OpenStreetMap Nominatim for geocoding.
-    // `city` can be a place name ("Batam", "Nongsa, Batam") or raw coordinates ("1.0456,104.0305").
-    // Set useOpenMeteo to false to fall back to upstream's wttr.in code path.
-    property bool useOpenMeteo: true
-
-    // Cached geocoding result so we only look a city up once
-    property var omGeo: ({
-        query: "",
-        valid: false,
-        lat: 0,
-        lon: 0,
-        name: ""
-    })
-    property string omPendingQuery: ""
-
-    // WMO weather code -> OpenWeather-style condition id (keeps existing icon mapping working)
-    readonly property var omWmoToOwm: ({
-        0: 800, 1: 801, 2: 802, 3: 804,
-        45: 741, 48: 741,
-        51: 300, 53: 301, 55: 302,
-        56: 511, 57: 511,
-        61: 500, 63: 501, 65: 502,
-        66: 511, 67: 511,
-        71: 600, 73: 601, 75: 602, 77: 600,
-        80: 520, 81: 521, 82: 522,
-        85: 620, 86: 621,
-        95: 201, 96: 202, 99: 202
-    })
-
-    readonly property var omWmoText: ({
-        0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
-        45: "fog", 48: "rime fog",
-        51: "light drizzle", 53: "moderate drizzle", 55: "dense drizzle",
-        56: "light freezing drizzle", 57: "dense freezing drizzle",
-        61: "light rain", 63: "moderate rain", 65: "heavy rain",
-        66: "light freezing rain", 67: "heavy freezing rain",
-        71: "light snow", 73: "moderate snow", 75: "heavy snow", 77: "snow grains",
-        80: "light rain showers", 81: "moderate rain showers", 82: "violent rain showers",
-        85: "light snow showers", 86: "heavy snow showers",
-        95: "thunderstorm", 96: "thunderstorm with hail", 99: "thunderstorm with heavy hail"
-    })
-
-    // "2026-10-27T05:58" (location-local time) -> "5:58:00 AM"
-    function omFmtLocalIso(iso) {
-        if (!iso || iso.indexOf("T") < 0) return "0"
-        const parts = iso.split("T")[1].split(":")
-        const h = parseInt(parts[0])
-        const m = parts[1]
-        const h12 = h % 12 === 0 ? 12 : h % 12
-        return `${h12}:${m}:00 ${h >= 12 ? "PM" : "AM"}`
-    }
-
-    function omRefineData(data, cityName) {
-        const cur = data?.current || {}
-        const daily = data?.daily || {}
         let temp = {}
+        const rainMm = data?.rain?.["1h"] || data?.rain?.["3h"] || 0
+        const snowMm = data?.snow?.["1h"] || data?.snow?.["3h"] || 0
 
-        const code = cur.weather_code ?? 0
-        const precipVal = cur.precipitation || 0
+        temp.description = data?.weather?.[0]?.description || ""
+        temp.cr = data?.clouds?.all !== undefined
+        ? Math.round(data.clouds.all * 0.8) + "%"
+        : "0%"
+        temp.humidity = (data?.main?.humidity || 0) + "%"
 
-        temp.description = root.omWmoText[code] || ""
-        temp.cr = Math.round((cur.cloud_cover || 0) * 0.8) + "%"
-        temp.humidity = (cur.relative_humidity_2m || 0) + "%"
-        temp.sunrise = omFmtLocalIso(daily.sunrise?.[0])
-        temp.sunset = omFmtLocalIso(daily.sunset?.[0])
-        temp.uv = Math.round(cur.uv_index || 0)
-        temp.windDir = cur.wind_direction_10m || 0
-        temp.wCode = root.omWmoToOwm[code] || 0
-        temp.city = cityName || "City"
+        const fmt = (unix) => new Date(unix * 1000).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        })
+
+        temp.sunrise = data?.sys?.sunrise ? fmt(data.sys.sunrise) : "0"
+        temp.sunset  = data?.sys?.sunset  ? fmt(data.sys.sunset)  : "0"
+
+        temp.windDir = data?.wind?.deg || 0
+        temp.wCode = data?.weather?.[0]?.id || 0
+        temp.city = data?.name || "City"
 
         if (root.useUSCS) {
-            temp.wind = (cur.wind_speed_10m || 0) + " mph"
-            temp.precip = precipVal.toFixed(2) + " in"
-            temp.visib = ((cur.visibility || 0) / 1609).toFixed(1) + " mi"
-            temp.temp = Math.round(cur.temperature_2m || 0) + "°F"
-            temp.tempFeelsLike = Math.round(cur.apparent_temperature || 0) + "°F"
+            temp.wind = (data?.wind?.speed || 0) + " mph"
+            temp.precip = ((rainMm + snowMm) * 0.0394).toFixed(2) + " in"
+            temp.visib = ((data?.visibility || 0) / 1609).toFixed(1) + " mi"
+            temp.press = (data?.main?.pressure || 0) + " hPa"
+            temp.temp = Math.round(data?.main?.temp || 0) + "°F"
+            temp.tempFeelsLike = Math.round(data?.main?.feels_like || 0) + "°F"
         } else {
-            temp.wind = (cur.wind_speed_10m || 0) + " m/s"
-            temp.precip = precipVal.toFixed(1) + " mm"
-            temp.visib = ((cur.visibility || 0) / 1000).toFixed(1) + " km"
-            temp.temp = Math.round(cur.temperature_2m || 0) + "°C"
-            temp.tempFeelsLike = Math.round(cur.apparent_temperature || 0) + "°C"
+            temp.wind = (data?.wind?.speed || 0) + " m/s"
+            temp.precip = (rainMm + snowMm).toFixed(1) + " mm"
+            temp.visib = ((data?.visibility || 0) / 1000).toFixed(1) + " km"
+            temp.press = (data?.main?.pressure || 0) + " hPa"
+            let roundedTemp = Math.round(data?.main?.temp || 0)
+            let roundedFeels = Math.round(data?.main?.feels_like || 0)
+
+            temp.temp = roundedTemp + "°C"
+            temp.tempFeelsLike = roundedFeels + "°C"
         }
-        temp.press = Math.round(cur.pressure_msl || 0) + " hPa"
 
         temp.lastRefresh = DateTime.time + " • " + DateTime.date
 
         root.data = temp
     }
 
-    function omFetchWeather(lat, lon, cityName) {
-        const current = [
-            "temperature_2m", "apparent_temperature", "relative_humidity_2m",
-            "precipitation", "weather_code", "cloud_cover", "pressure_msl",
-            "wind_speed_10m", "wind_direction_10m", "visibility", "uv_index"
-        ].join(",")
+    function getData() {
+        if (OpenMeteoWeather.update(root)) return // local override, see OpenMeteoWeather.qml
+        const defaultApiKey = "8b05d62206f459e1d298cbe5844d7d87"
+        let apiKey = KeyringStorage.keyringData?.apiKeys?.openweather || defaultApiKey
 
-        let url = "https://api.open-meteo.com/v1/forecast?"
-        url += `latitude=${lat}&longitude=${lon}`
-        url += `&current=${current}`
-        url += `&daily=sunrise,sunset&forecast_days=1&timezone=auto`
-        url += root.useUSCS
-            ? "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"
-            : "&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm"
+        if (!apiKey || apiKey === "") {
+            console.error("[WeatherService] Missing OpenWeather API key.")
+            return
+        }
 
-        omWeatherFetcher.cityName = cityName
-        omWeatherFetcher.command = ["bash", "-c", `curl -s --max-time 15 "${url}"`]
-        omWeatherFetcher.running = true
-    }
+        let units = root.useUSCS ? "imperial" : "metric"
+        let url = "https://api.openweathermap.org/data/2.5/weather?"
 
-    function omGeocode(query) {
-        root.omPendingQuery = query
-        const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=" + encodeURIComponent(query)
-        omGeocoder.command = ["bash", "-c", `curl -s --max-time 15 -A "quickshell-weather/1.0" "${url}"`]
-        omGeocoder.running = true
-    }
-
-    function getDataOpenMeteo() {
-        // 1) GPS (upstream's onPositionChanged stores the longitude in location.long)
         if (root.gpsActive && root.location.valid) {
-            omFetchWeather(root.location.lat, root.location.long, root.city.trim())
-            return
+            url += `lat=${root.location.lat}&lon=${root.location.lon}`
+        } else {
+            url += `q=${formatCityName(root.city)}`
         }
 
-        const query = root.city.trim()
-        if (query === "") return
+        url += `&units=${units}`
+        url += `&appid=${apiKey}`
 
-        // 2) Raw "lat,lon" in the city field
-        const m = query.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/)
-        if (m) {
-            omFetchWeather(m[1], m[2], "")
-            return
-        }
+        let command = `curl -s "${url}"`
 
-        // 3) Cached geocode
-        if (root.omGeo.valid && root.omGeo.query === query) {
-            omFetchWeather(root.omGeo.lat, root.omGeo.lon, root.omGeo.name)
-            return
-        }
-
-        // 4) Look the place up, then fetch
-        omGeocode(query)
+        fetcher.command[2] = command
+        fetcher.running = true
     }
 
-    Process {
-        id: omGeocoder
-        command: ["bash", "-c", ""]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length === 0) return
-
-                try {
-                    const results = JSON.parse(text)
-                    if (!Array.isArray(results) || results.length === 0) {
-                        console.error(`[WeatherService] Could not find "${root.omPendingQuery}". Try a nearby larger place or "lat,lon".`)
-                        return
-                    }
-
-                    const r = results[0]
-                    root.omGeo = {
-                        query: root.omPendingQuery,
-                        valid: true,
-                        lat: parseFloat(r.lat),
-                        lon: parseFloat(r.lon),
-                        name: r.name || root.omPendingQuery
-                    }
-                    root.omFetchWeather(root.omGeo.lat, root.omGeo.lon, root.omGeo.name)
-                } catch (e) {
-                    console.error("[WeatherService] Geocoding parse error:", e.message)
-                }
-            }
-        }
+    function formatCityName(cityName) {
+        return cityName.trim().split(/\s+/).join('+')
     }
-
-    Process {
-        id: omWeatherFetcher
-        property string cityName: ""
-        command: ["bash", "-c", ""]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length === 0) return
-
-                try {
-                    const parsedData = JSON.parse(text)
-
-                    if (parsedData.error) {
-                        console.error("[WeatherService] API error:", parsedData.reason)
-                        return
-                    }
-
-                    root.omRefineData(parsedData, omWeatherFetcher.cityName)
-                } catch (e) {
-                    console.error("[WeatherService] JSON parse error:", e.message)
-                }
-            }
-        }
-    }
-    // ─── end Open-Meteo backend ──────────────────────────────────────────────
 
     Component.onCompleted: {
-        if (!root.gpsActive) return;
-        console.info("[WeatherService] Starting the GPS service.");
-        positionSource.start();
+        if (!root.gpsActive) return
+            console.info("[WeatherService] Starting GPS service.")
+            positionSource.start()
     }
 
     Process {
@@ -316,14 +136,20 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0)
-                    return;
-                try {
-                    const parsedData = JSON.parse(text);
-                    root.refineData(parsedData);
-                    // console.info(`[ data: ${JSON.stringify(parsedData)}`);
-                } catch (e) {
-                    console.error(`[WeatherService] ${e.message}`);
-                }
+                    return
+
+                    try {
+                        const parsedData = JSON.parse(text)
+
+                        if (parsedData.cod && parsedData.cod !== 200) {
+                            console.error("[WeatherService] API error:", parsedData.message)
+                            return
+                        }
+
+                        root.refineData(parsedData)
+                    } catch (e) {
+                        console.error("[WeatherService] JSON parse error:", e.message)
+                    }
             }
         }
     }
@@ -333,28 +159,23 @@ Singleton {
         updateInterval: root.fetchInterval
 
         onPositionChanged: {
-            // update the location if the given location is valid
-            // if it fails getting the location, use the last valid location
             if (position.latitudeValid && position.longitudeValid) {
-                root.location.lat = position.coordinate.latitude;
-                root.location.long = position.coordinate.longitude;
-                root.location.valid = true;
-                // console.info(`📍 Location: ${position.coordinate.latitude}, ${position.coordinate.longitude}`);
-                root.getData();
-                // if can't get initialized with valid location deactivate the GPS
+                root.location.lat = position.coordinate.latitude
+                root.location.lon = position.coordinate.longitude
+                root.location.valid = true
+                root.getData()
             } else {
-                root.gpsActive = root.location.valid ? true : false;
-                console.error("[WeatherService] Failed to get the GPS location.");
+                root.gpsActive = root.location.valid ? true : false
+                console.error("[WeatherService] Failed to get GPS location.")
             }
         }
 
         onValidityChanged: {
             if (!positionSource.valid) {
-                positionSource.stop();
-                root.location.valid = false;
-                root.gpsActive = false;
-                Quickshell.execDetached(["notify-send", Translation.tr("Weather Service"), Translation.tr("Cannot find a GPS service. Using the fallback method instead."), "-a", "Shell"]);
-                console.error("[WeatherService] Could not aquire a valid backend plugin.");
+                positionSource.stop()
+                root.location.valid = false
+                root.gpsActive = false
+                console.error("[WeatherService] Could not acquire valid GPS backend.")
             }
         }
     }
