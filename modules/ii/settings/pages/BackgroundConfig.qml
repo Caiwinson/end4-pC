@@ -1094,6 +1094,16 @@ ContentPage {
                         Config.options.background.widgets.imageCard.sizeMode = newValue
                     }
                 }
+                ConfigTextArea {
+                    enabled: Config.options.background.widgets.imageCard.enable
+                    Layout.fillWidth: true
+                    fieldWidth: 300
+                    buttonIcon: "link"
+                    text: Translation.tr("Image URL")
+                    placeholderText: "https://example.com/image.jpg"
+                    value: Config.options.background.widgets.imageCard.url
+                    onValueChanged: Config.options.background.widgets.imageCard.url = value.trim()
+                }
             }
         }
 

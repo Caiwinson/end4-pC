@@ -433,6 +433,7 @@ Singleton {
                         property real y: 100
                         property real z: 0
                         property string path: ""
+                        property string url: ""
                         property string sizeMode: "1x2"
                     }
 

@@ -12,7 +12,25 @@ AbstractBackgroundWidget {
     hoverEnabled: true
 
     property string imagePath: root.configEntry.path ?? ""
+    property string imageUrl: root.configEntry.url ?? ""
+    property int refreshToken: 0
+    readonly property string imageSource: {
+        if (root.imageUrl === "") return root.imagePath
+        const fragmentIndex = root.imageUrl.indexOf("#")
+        const base = fragmentIndex >= 0 ? root.imageUrl.slice(0, fragmentIndex) : root.imageUrl
+        const fragment = fragmentIndex >= 0 ? root.imageUrl.slice(fragmentIndex) : ""
+        const cleanBase = base.replace(/([?&])_refresh=[^&]*/g, "$1").replace(/[?&]$/, "")
+        const separator = cleanBase.includes("?") ? "&" : "?"
+        return cleanBase + separator + "_refresh=" + root.refreshToken + fragment
+    }
     property bool dropHover: false
+
+    Timer {
+        interval: 60000
+        running: root.imageUrl !== ""
+        repeat: true
+        onTriggered: root.refreshToken++
+    }
 
     readonly property real cardSpacing: 12
     readonly property real singleWidth: 132
@@ -62,7 +80,10 @@ AbstractBackgroundWidget {
             var cleanPath = drop.urls[0].toString().replace(/^file:\/\//, "")
             var ext = cleanPath.split(".").pop().toLowerCase()
             var accepted = ["png", "jpg", "jpeg", "webp", "avif", "bmp", "gif", "tiff", "tif"]
-            if (accepted.indexOf(ext) !== -1) root.configEntry.path = cleanPath
+            if (accepted.indexOf(ext) !== -1) {
+                root.configEntry.url = ""
+                root.configEntry.path = cleanPath
+            }
         }
         root.dropHover = false
     }
@@ -80,7 +101,7 @@ AbstractBackgroundWidget {
 
     Image {
         id: probe
-        source: root.imagePath
+        source: root.imageSource
         visible: false
         asynchronous: true
         cache: false
@@ -104,8 +125,8 @@ AbstractBackgroundWidget {
 
             StyledImage {
                 anchors.fill: parent
-                source: root.imagePath
-                visible: root.imagePath !== ""
+                source: root.imageSource
+                visible: root.imageSource !== ""
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 antialiasing: true
@@ -121,7 +142,7 @@ AbstractBackgroundWidget {
                 text: root.dropHover ? "download" : "image"
                 fill: root.dropHover ? 1 : 0
                 color: root.dropHover ? Appearance.colors.colPrimary : Appearance.colors.colOnPrimaryContainer
-                visible: root.imagePath === ""
+                visible: root.imageSource === ""
                 Behavior on color { animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this) }
             }
 
