@@ -127,6 +127,10 @@ AbstractBackgroundWidget {
                 anchors.fill: parent
                 source: root.imageSource
                 visible: root.imageSource !== ""
+                // Keep the current frame visible while the refreshed URL loads.
+                // StyledImage's default opacity follows status and would hide it
+                // as soon as the new request enters Loading.
+                opacity: root.imageSource !== "" ? 1 : 0
                 fillMode: Image.PreserveAspectCrop
                 cache: false
                 antialiasing: true
