@@ -67,9 +67,7 @@ Scope {
             readonly property bool vertical: position !== "bottom"
             readonly property real gap: Appearance.sizes.hyprlandGapsOut
             readonly property real shadowMargin: Appearance.sizes.elevationMargin
-            readonly property color backgroundColor: (hug && Config.options.dock.followFrameColor && Config.options.bar.showFrame)
-                ? Appearance.getColorFromName(Config.options.bar.frameColor)
-                : Appearance.getColorFromName(Config.options.dock.backgroundColor)
+            readonly property color backgroundColor: DockStyle.backgroundColor
             readonly property real borderWidth: (Config.options.dock.showBackground && Config.options.dock.showBorder && !hug) ? Config.options.dock.borderWidth : 0
 
             property var monitor: WM.monitorFor(modelData.screen)
