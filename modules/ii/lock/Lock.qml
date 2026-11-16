@@ -136,11 +136,11 @@ LockScreen {
     Variants {
         model: Quickshell.screens
         delegate: Scope {
-            required property var modelData
+            required property ShellScreen modelData
             property bool shouldPush: GlobalStates.screenLocked
-            property string targetMonitorName: modelData?.name ?? ""
-            property int verticalMovementDistance: modelData?.height ?? 0
-            property int horizontalSqueeze: (modelData?.width ?? 0) * 0.2
+            property string targetMonitorName: modelData.name
+            property int verticalMovementDistance: modelData.height
+            property int horizontalSqueeze: modelData.width * 0.2
         }
     }
 }
