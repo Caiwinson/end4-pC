@@ -11,7 +11,7 @@ OsdTextIndicator {
     // Node names look like "alsa_output.usb-KTMicro_Chu2_DSP-00.analog-stereo"
     readonly property var friendlyNames: [
         { match: "KTMicro_Chu2_DSP", label: "Earphone", icon: "headphones" },
-        { match: "pci-0000_03_00.6", label: "Speaker", icon: "speaker" }
+        { match: "pci-0000_2e_00.4", label: "Speaker", icon: "speaker" }
     ]
     readonly property var friendly: {
         const n = root.sink?.name ?? "";
