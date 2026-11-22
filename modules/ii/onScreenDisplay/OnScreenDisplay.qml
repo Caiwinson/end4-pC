@@ -54,6 +54,7 @@ Scope {
 
     // Ignore initial values emitted at startup
     property bool startupDone: false
+    property bool defaultAudioSinkSeen: false
     property string displayMode: "off"
     property var volumePlayer: null
     Timer {
@@ -137,6 +138,12 @@ Scope {
     Connections {
         target: Pipewire
         function onDefaultAudioSinkChanged() {
+            // Pipewire emits its initial default sink during startup. Ignore
+            // that first notification so it does not open the OSD on login.
+            if (!root.defaultAudioSinkSeen) {
+                root.defaultAudioSinkSeen = true;
+                return;
+            }
             if (!root.startupDone)
                 return;
             root.protectionMessage = "";
