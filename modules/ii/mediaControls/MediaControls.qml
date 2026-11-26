@@ -66,7 +66,7 @@ Scope {
             // Find duplicates by trackTitle prefix
             for (let j = i + 1; j < players.length; ++j) {
                 let p2 = players[j];
-                if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (p1.position - p2.position <= 2 && p1.length - p2.length <= 2)) {
+                if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (Math.abs(p1.position - p2.position) <= 2 && Math.abs(p1.length - p2.length) <= 2)) {
                     group.push(j);
                 }
             }
@@ -82,51 +82,6 @@ Scope {
         return filtered;
     }
 
-    // --- Only run cava when the active player is Feishin ---
-    readonly property bool activePlayerIsFeishin: {
-        const p = MprisController.activePlayer
-        if (!p) return false
-        return (p.identity ?? "").toLowerCase().includes("feishin") ||
-               (p.desktopEntry ?? "").toLowerCase().includes("feishin")
-    }
-
-    // --- Pause cava when the active window is fullscreen ---
-    property bool activeWindowFullscreen: false
-
-    Process {
-        id: fullscreenCheck
-        command: ["hyprctl", "activewindow", "-j"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const w = JSON.parse(text);
-                    // fullscreen: 0 = none, 1 = maximized, 2 = fullscreen
-                    root.activeWindowFullscreen = w.fullscreen === true || Number(w.fullscreen) >= 2;
-                } catch (e) {
-                    // empty output = no active window
-                    root.activeWindowFullscreen = false;
-                }
-            }
-        }
-    }
-
-    Timer {
-        id: fullscreenDebounce
-        interval: 50
-        onTriggered: fullscreenCheck.running = true
-    }
-
-    Connections {
-        target: Hyprland
-        function onRawEvent(event) {
-            if (["fullscreen", "activewindow", "activewindowv2", "workspace", "workspacev2",
-                 "focusedmon", "closewindow", "movewindow"].includes(event.name))
-                fullscreenDebounce.restart();
-        }
-    }
-
-    Component.onCompleted: fullscreenCheck.running = true
-
     Process {
         id: cavaProc
         running: (GlobalStates.mediaControlsOpen ||
@@ -141,8 +96,6 @@ Scope {
             Config.options.bar.layouts.rightLayout.includes("visualizer") ||
             Config.options.background.widgets.visualizer.enable)
             && (MprisController.activePlayer?.isPlaying ?? false)
-            && root.activePlayerIsFeishin
-            && !root.activeWindowFullscreen
         onRunningChanged: {
             if (!cavaProc.running) {
                 GlobalStates.visualizerPoints = [];
@@ -250,7 +203,7 @@ Scope {
                         required property MprisPlayer modelData
                         readonly property real targetHeight: showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
                         player: modelData
-                        visualizerPoints: GlobalStates.visualizerPoints  
+                        visualizerPoints: GlobalStates.visualizerPoints
                         implicitWidth: root.widgetWidth
                         implicitHeight: root.meaningfulPlayers.length === 1 ? 290 : targetHeight
                         designHeight: targetHeight
